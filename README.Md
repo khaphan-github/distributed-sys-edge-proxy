@@ -14,8 +14,11 @@
 - https://medium.com/@viggnah/how-to-deploy-envoy-as-an-edge-proxy-on-kubernetes-f1af78e1ebfb
 
 # High level design:
+
 ![alt text](image.png)
+
 <!-- ![alt text](./imgs/architechture.png) -->
+
 Short desc: Flask app run in side a container, container be managed by kubernetes, and expose a service to outside world, it call the other Flask app to get data. through envoy proxy.
 
 # Implementation steps:
@@ -44,10 +47,21 @@ minikube image ls
 kubectl apply -f k8s/deployment-svc.yaml
 kubectl get deployment
 kubectl get svc
-kubectl logs -l app=edge_proxy_app --all-containers          
+kubectl logs -l app=edge_proxy_app --all-containers
 
 http://10.98.253.109:4200/
 ```
+
+# Port Mapping
+
+| Resource     | app-a                | app-b                | app-c                |
+| ------------ | -------------------- | -------------------- | -------------------- |
+| ConfigMap    | `envoy-config-app-a` | `envoy-config-app-b` | `envoy-config-app-c` |
+| Admin port   | `9901`               | `9902`               | `9903`               |
+| Flask port   | `9001`               | `9002`               | `9003`               |
+| Service port | `9101`               | `9102`               | `9103`               |
+| LB port      | `9210`               | `9220`               | `9230`               |
+| Image        | `edge_proxy_app-a`   | `edge_proxy_app-b`   | `edge_proxy_app-c`   |
 
 # Install enoy local sever
 

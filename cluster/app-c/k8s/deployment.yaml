@@ -1,0 +1,189 @@
+# ConfigMap for Envoy Proxy Configuration
+# Best Practice: Separate ConfigMap files for easier management and reusability
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-config-app-c
+  namespace: default
+  labels:
+    app: envoyrproxy
+    component: config
+  annotations:
+    description: "Envoy proxy configuration files"
+    version: "1.0"
+data:
+  # Envoy configuration file
+  envoy.yaml: |
+    admin:
+      access_log_path: /tmp/admin_access.log
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9903
+
+    static_resources:
+      listeners:
+        - name: app_c_sidecar_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 3200
+
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: app_c_sidecar_hcm_filter
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                    route_config:
+                      name: app_c_sidecar_http_route_config
+                      virtual_hosts:
+                        - name: app_c_sidecar_virtual_host
+                          domains:
+                            - "*"
+                          routes:
+                            - name: app_c_sidecar_route
+                              match:
+                                prefix: "/"
+                              route:
+                                cluster: app_c_service
+
+      clusters:
+        - name: app_c_service
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: app_c_service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: app-c-service
+                          port_value: 9103
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-c-deployment
+  labels:
+    app: app-c
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-c
+  template:
+    metadata:
+      labels:
+        app: app-c
+    spec:
+      containers:
+        - name: app-c
+          image: edge_proxy_app-c:latest
+          ports:
+            - containerPort: 9003
+              name: flask-port
+          imagePullPolicy: Never
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoyrproxy-app-c-deployment
+  labels:
+    app: envoyrproxy-app-c
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoyrproxy-app-c
+  template:
+    metadata:
+      labels:
+        app: envoyrproxy-app-c
+    spec:
+      volumes:
+        - name: envoy-config-volume
+          configMap:
+            name: envoy-config-app-c
+            # Mount specific file with proper permissions
+            defaultMode: 0644
+            items:
+              - key: envoy.yaml
+                path: envoy.yaml
+      containers:
+        - name: edge-proxy-envoy
+          image: edge_proxy_envoy:latest
+          ports:
+            - containerPort: 3200
+              name: envoy-port
+          # Mount config files from ConfigMap
+          volumeMounts:
+            - name: envoy-config-volume
+              mountPath: /etc/envoy
+              readOnly: true
+          imagePullPolicy: Never
+          # Health checks (best practice)
+          livenessProbe:
+            httpGet:
+              path: /stats
+              port: 9903
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /stats
+              port: 9903
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # Resource limits (best practice)
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoyrproxy-service-app-c
+spec:
+  type: LoadBalancer
+  selector:
+    app: envoyrproxy-app-c
+  ports:
+    - name: envoyrproxy-svc-port
+      protocol: TCP
+      port: 9230
+      targetPort: envoy-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-c-service
+spec:
+  type: ClusterIP
+  selector:
+    app: app-c
+  ports:
+    - name: app-c-svc-port
+      protocol: TCP
+      port: 9103
+      targetPort: flask-port
