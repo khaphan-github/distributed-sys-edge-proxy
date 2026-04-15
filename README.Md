@@ -14,8 +14,8 @@
 - https://medium.com/@viggnah/how-to-deploy-envoy-as-an-edge-proxy-on-kubernetes-f1af78e1ebfb
 
 # High level design:
-
-![alt text](./imgs/architechture.png)
+![alt text](image.png)
+<!-- ![alt text](./imgs/architechture.png) -->
 Short desc: Flask app run in side a container, container be managed by kubernetes, and expose a service to outside world, it call the other Flask app to get data. through envoy proxy.
 
 # Implementation steps:
@@ -31,9 +31,9 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-a
 
 ```bash
 
-  docker build -t livescores:latest ./flask-app/
-  minikube image load livescores:latest
-  kubectl rollout restart deployment livescores-deployment
+docker build -t livescores:latest ./flask-app/
+minikube image load livescores:latest
+kubectl rollout restart deployment livescores-deployment
 
 
 
@@ -44,7 +44,7 @@ minikube image ls
 kubectl apply -f k8s/deployment-svc.yaml
 kubectl get deployment
 kubectl get svc
-kubectl logs -l app=livescores --all-containers          
+kubectl logs -l app=edge_proxy_app --all-containers          
 
 http://10.98.253.109:4200/
 ```

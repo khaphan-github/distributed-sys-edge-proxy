@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoyrproxy-app-a-deployment
+  labels:
+    app: envoyrproxy-app-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoyrproxy-app-a
+  template:
+    metadata:
+      labels:
+        app: envoyrproxy-app-a
+    spec:
+      volumes:
+        - name: envoy-config-volume
+          configMap:
+            name: envoy-config-app-a
+            # Mount specific file with proper permissions
+            defaultMode: 0644
+            items:
+              - key: envoy.yaml
+                path: envoy.yaml
+      containers:
+        - name: edge-proxy-envoy
+          image: edge_proxy_envoy:latest
+          ports:
+            - containerPort: 3200
+              name: envoy-port
+          # Mount config files from ConfigMap
+          volumeMounts:
+            - name: envoy-config-volume
+              mountPath: /etc/envoy
+              readOnly: true
+          imagePullPolicy: Never
+          # Health checks (best practice)
+          livenessProbe:
+            httpGet:
+              path: /stats
+              port: 9901
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /stats
+              port: 9901
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # Resource limits (best practice)
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoyrproxy-service-app-a
+spec:
+  type: LoadBalancer
+  selector:
+    app: envoyrproxy-app-a
+  ports:
+    - name: envoyrproxy-svc-port
+      protocol: TCP
+      port: 9210
+      targetPort: envoy-port

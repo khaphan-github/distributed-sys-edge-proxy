@@ -1,0 +1,72 @@
+# ConfigMap for Envoy Proxy Configuration
+# Best Practice: Separate ConfigMap files for easier management and reusability
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-config-app-a
+  namespace: default
+  labels:
+    app: envoyrproxy
+    component: config
+  annotations:
+    description: "Envoy proxy configuration files"
+    version: "1.0"
+data:
+  # Envoy configuration file
+  envoy.yaml: |
+    admin:
+      access_log_path: /tmp/admin_access.log
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901
+
+    static_resources:
+      listeners:
+        - name: app_a_sidecar_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 3200
+
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: app_a_sidecar_hcm_filter
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                    route_config:
+                      name: app_a_sidecar_http_route_config
+                      virtual_hosts:
+                        - name: app_a_sidecar_virtual_host
+                          domains:
+                            - "*"
+                          routes:
+                            - name:
+                              match:
+                                prefix: "/"
+                              route:
+                                cluster: app_a_service
+
+      clusters:
+        - name: app_a_service
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: app_a_service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: app-a-service
+                          port_value: 9101

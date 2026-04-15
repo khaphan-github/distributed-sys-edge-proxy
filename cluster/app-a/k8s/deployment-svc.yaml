@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-a-deployment
+  labels:
+    app: app-a
+
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-a
+  template:
+    metadata:
+      labels:
+        app: app-a
+    spec:
+      containers:
+        - name: app-a
+          image: edge_proxy_app-a:latest
+          ports:
+            - containerPort: 9001
+              name: flask-port
+          imagePullPolicy: Never
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-a-service
+spec:
+  type: ClusterIP
+  selector:
+    app: app-a
+  ports:
+    - name: app-a-svc-port
+      protocol: TCP
+      port: 9101
+      targetPort: flask-port
