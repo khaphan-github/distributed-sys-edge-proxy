@@ -165,7 +165,7 @@ kind: Service
 metadata:
   name: envoyrproxy-service-app-b
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: envoyrproxy-app-b
   ports:
