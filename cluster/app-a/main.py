@@ -1,10 +1,12 @@
 import os
 import platform
 import sys
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import Literal
 import requests
 
-app = FastAPI(title="app:a", version="1.0.0")
+app = FastAPI(title="app:a", version="1.0.1")
 
 SERVICE_B = os.getenv("SERVICE_B_URL", "")
 SERVICE_C = os.getenv("SERVICE_C_URL", "")
@@ -18,24 +20,26 @@ def ping():
 def get_service_info():
     return {
         "service": "app:a",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "python_version": sys.version,
         "platform": platform.system(),
         "host": platform.node(),
     }
   
   
-@app.get("/explore/services")
-def get_service_info(request: Request):
-    query_params = request.query_params
-    target_service = query_params.get("service")
-    
-    print(f"Received request to explore service: {target_service}")
-    if target_service == "app:b":
-        response = requests.get(SERVICE_B)
+class ExploreRequest(BaseModel):
+    service: Literal["app:b", "app:c"]
+
+
+@app.post("/explore/services")
+def explore_services(body: ExploreRequest):
+    service = body.service
+    print(f"Received request to explore service: {service}")
+    if service == "app:b":
+        response = requests.get(SERVICE_B + '/info')
         return {"service": "app:b", "url": SERVICE_B, "response": response.json()}
-    
-    if target_service == "app:c":
-        response = requests.get(SERVICE_C)
+
+    if service == "app:c":
+        response = requests.get(SERVICE_C + '/info')
         return {"service": "app:c", "url": SERVICE_C, "response": response.json()}
     return {"error": "Service not found"}
