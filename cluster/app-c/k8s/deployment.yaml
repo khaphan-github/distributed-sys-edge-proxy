@@ -128,7 +128,7 @@ spec:
                 path: envoy.yaml
       containers:
         - name: edge-proxy-envoy
-          image: edge_proxy_envoy:latest
+          image: edge_proxy_envoy:v1.0.1
           ports:
             - containerPort: 3200
               name: envoy-port

@@ -89,7 +89,7 @@ spec:
     spec:
       containers:
         - name: app-b
-          image: edge_proxy_app-b:latest
+          image: edge_proxy_app-b:v1.0.1
           ports:
             - containerPort: 9002
               name: flask-port
